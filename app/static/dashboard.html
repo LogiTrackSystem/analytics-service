@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LogiTrack — Analítica</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            color-scheme: light;
+            --surface-1: #fcfcfb;
+            --page-plane: #f9f9f7;
+            --text-primary: #0b0b0b;
+            --text-secondary: #52514e;
+            --muted: #898781;
+            --gridline: #e1e0d9;
+            --baseline: #c3c2b7;
+            --border: rgba(11, 11, 11, 0.10);
+
+            --series-1: #2a78d6;
+            /* azul */
+            --series-2: #eb6834;
+            /* naranja */
+            --series-3: #1baf7a;
+            /* aqua */
+            --series-4: #eda100;
+            /* amarillo */
+            --series-5: #e87ba4;
+            /* magenta */
+            --series-6: #008300;
+            /* verde */
+            --series-7: #4a3aa7;
+            /* violeta */
+            --series-8: #e34948;
+            /* rojo */
+
+            --status-good: #0ca30c;
+            --status-warning: #fab219;
+            --status-serious: #ec835a;
+            --status-critical: #d03b3b;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                color-scheme: dark;
+                --surface-1: #1a1a19;
+                --page-plane: #0d0d0d;
+                --text-primary: #ffffff;
+                --text-secondary: #c3c2b7;
+                --muted: #898781;
+                --gridline: #2c2c2a;
+                --baseline: #383835;
+                --border: rgba(255, 255, 255, 0.10);
+
+                --series-1: #3987e5;
+                --series-2: #d95926;
+                --series-3: #199e70;
+                --series-4: #c98500;
+                --series-5: #d55181;
+                --series-6: #008300;
+                --series-7: #9085e9;
+                --series-8: #e66767;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--page-plane);
+            color: var(--text-primary);
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            font-size: 22px;
+            margin: 0;
+        }
+
+        header .subt {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        #estado-etl {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .card {
+            background: var(--surface-1);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .kpi-tile .kpi-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .kpi-tile .kpi-valor {
+            font-size: 26px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .kpi-tile .kpi-sub {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        .fila-charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 900px) {
+            .fila-charts {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card h2 {
+            font-size: 15px;
+            margin: 0 0 4px;
+        }
+
+        .card .nota {
+            font-size: 11px;
+            color: var(--muted);
+            margin: 0 0 10px;
+        }
+
+        canvas {
+            max-height: 280px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--gridline);
+        }
+
+        th {
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 12px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .badge-vencido {
+            background: color-mix(in srgb, var(--status-critical) 15%, transparent);
+            color: var(--status-critical);
+        }
+
+        .badge-critico {
+            background: color-mix(in srgb, var(--status-serious) 18%, transparent);
+            color: var(--status-serious);
+        }
+
+        .badge-proximo {
+            background: color-mix(in srgb, var(--status-warning) 22%, transparent);
+            color: #8a5a00;
+        }
+
+        .badge-programado {
+            background: color-mix(in srgb, var(--status-good) 15%, transparent);
+            color: var(--status-good);
+        }
+
+        .badge-sin_datos_suficientes {
+            background: rgba(137, 135, 129, 0.15);
+            color: var(--muted);
+        }
+
+        .badge-eficiente {
+            background: color-mix(in srgb, var(--status-good) 15%, transparent);
+            color: var(--status-good);
+        }
+
+        .badge-normal {
+            background: color-mix(in srgb, var(--status-warning) 22%, transparent);
+            color: #8a5a00;
+        }
+
+        .badge-ineficiente {
+            background: color-mix(in srgb, var(--status-critical) 15%, transparent);
+            color: var(--status-critical);
+        }
+
+        .badge-sin_datos {
+            background: rgba(137, 135, 129, 0.15);
+            color: var(--muted);
+        }
+
+        #feed {
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        #feed .item {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--gridline);
+            font-size: 13px;
+        }
+
+        #feed .item .hora {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        #feed .item .msg {
+            margin-top: 2px;
+        }
+
+        .tabla-scroll {
+            max-height: 340px;
+            overflow-y: auto;
+        }
+
+        .vacio {
+            color: var(--muted);
+            font-size: 13px;
+            padding: 20px 0;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div>
+            <h1>LogiTrack — Panel de Control y Analítica</h1>
+            <div class="subt">Estado agregado de los 9 microservicios de negocio, actualizado automáticamente</div>
+        </div>
+        <div id="estado-etl">cargando…</div>
+    </header>
+
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <div class="fila-charts">
+        <div class="card">
+            <h2>Utilización de flota</h2>
+            <p class="nota">Vehículo "en uso" = su ruta más reciente está asociada a un envío pendiente o en tránsito.
+            </p>
+            <canvas id="chart-utilizacion"></canvas>
+        </div>
+        <div class="card">
+            <h2>Costo por kilómetro por tipo de vehículo</h2>
+            <p class="nota">Solo se muestran tipos con distancia real registrada en Billing Service.</p>
+            <canvas id="chart-costo-km"></canvas>
+            <div id="costo-km-vacio" class="vacio" style="display:none">Sin datos suficientes todavía — Routing Service
+                no ha calculado ninguna distancia real.</div>
+        </div>
+    </div>
+
+    <div class="fila-charts">
+        <div class="card">
+            <h2>Entregas diarias (últimos 30 días)</h2>
+            <p class="nota">A tiempo / con retraso / con incidencia / devuelto, por día de ocurrencia del evento.</p>
+            <canvas id="chart-entregas"></canvas>
+        </div>
+        <div class="card">
+            <h2>Eficiencia de combustible por conductor</h2>
+            <p class="nota">Km recorridos por cada 1% de combustible consumido (últimos 7 días de telemetría). Mayor es
+                mejor.</p>
+            <canvas id="chart-eficiencia"></canvas>
+        </div>
+    </div>
+
+    <div class="fila-charts">
+        <div class="card">
+            <h2>Proyección de mantenimiento (90 días)</h2>
+            <p class="nota">Por fecha real si existe; si no, estimada por kilometraje y tendencia real de uso del
+                vehículo.</p>
+            <div class="tabla-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Placa</th>
+                            <th>Tipo de mantenimiento</th>
+                            <th>Urgencia</th>
+                            <th>Días restantes</th>
+                            <th>Km restantes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-mantenimiento"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <h2>Actividad reciente</h2>
+            <p class="nota">Últimos eventos del sistema (8 tipos de evento en vivo vía RabbitMQ).</p>
+            <div id="feed"></div>
+        </div>
+    </div>
+
+    <script>
+        const root = getComputedStyle(document.documentElement);
+        const c = (name) => root.getPropertyValue(name).trim();
+
+        const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+        const fmtNum = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 });
+
+        async function getJSON(url) {
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) return null;
+                return await resp.json();
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function badgeUrgencia(u) {
+            const etiquetas = {
+                vencido: 'Vencido', critico: 'Crítico', proximo: 'Próximo',
+                programado: 'Programado', sin_datos_suficientes: 'Sin datos suficientes',
+            };
+            return `<span class="badge badge-${u}"><span class="dot"></span>${etiquetas[u] || u}</span>`;
+        }
+
+        function badgeClasificacion(cl) {
+            const etiquetas = { eficiente: 'Eficiente', normal: 'Normal', ineficiente: 'Ineficiente', sin_datos: 'Sin datos' };
+            return `<span class="badge badge-${cl}"><span class="dot"></span>${etiquetas[cl] || cl}</span>`;
+        }
+
+        let charts = {};
+        function destruirSiExiste(key) { if (charts[key]) { charts[key].destroy(); delete charts[key]; } }
+
+        async function cargarResumen() {
+            const r = await getJSON('/dashboard/resumen');
+            if (!r) return;
+
+            const tiles = [
+                { label: 'Flota total', valor: r.total_vehiculos, sub: `${r.vehiculos_en_uso} en uso / ${r.flota_disponible} disponibles` },
+                { label: 'Conductores', valor: r.total_conductores, sub: '' },
+                { label: 'Envíos históricos', valor: r.total_envios_historico, sub: `${r.envios_en_transito} en tránsito` },
+                { label: 'Entregados', valor: r.envios_entregados_historico, sub: `${r.envios_con_incidencia_historico} con incidencia` },
+                { label: 'Cumplimiento SLA', valor: r.tasa_cumplimiento_sla_global_pct != null ? `${fmtNum.format(r.tasa_cumplimiento_sla_global_pct)}%` : 'Sin datos', sub: 'histórico, todas las entregas' },
+                { label: 'Retenidos en aduana', valor: r.envios_internacionales_retenidos, sub: 'envíos internacionales' },
+                { label: 'Facturación del mes', valor: r.facturacion_periodo_actual != null ? fmtCOP.format(r.facturacion_periodo_actual) : 'Sin datos', sub: 'periodo actual' },
+                { label: 'Mantenimientos vencidos', valor: r.programas_mantenimiento_vencidos, sub: 'requieren atención inmediata' },
+            ];
+
+            document.getElementById('kpi-grid').innerHTML = tiles.map(t => `
+    <div class="card kpi-tile">
+      <div class="kpi-label">${t.label}</div>
+      <div class="kpi-valor">${t.valor}</div>
+      <div class="kpi-sub">${t.sub}</div>
+    </div>
+  `).join('');
+
+            const estado = document.getElementById('estado-etl');
+            estado.textContent = r.ultima_actualizacion_etl
+                ? `Última actualización del ETL: ${new Date(r.ultima_actualizacion_etl).toLocaleString('es-CO')}`
+                : 'Esperando el primer ciclo de ETL…';
+        }
+
+        async function cargarUtilizacion() {
+            const filas = await getJSON('/dashboard/utilizacion-flota');
+            if (!filas) return;
+            const enUso = filas.filter(f => f.en_uso).length;
+            const disponible = filas.length - enUso;
+
+            destruirSiExiste('utilizacion');
+            charts.utilizacion = new Chart(document.getElementById('chart-utilizacion'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['En uso', 'Disponible'],
+                    datasets: [{
+                        data: [enUso, disponible],
+                        backgroundColor: [c('--series-1'), c('--series-3')],
+                        borderColor: c('--surface-1'),
+                        borderWidth: 2,
+                    }],
+                },
+                options: {
+                    plugins: { legend: { position: 'bottom', labels: { color: c('--text-secondary') } } },
+                },
+            });
+        }
+
+        async function cargarCostoPorKm() {
+            const filas = await getJSON('/dashboard/costo-por-km');
+            const vacio = document.getElementById('costo-km-vacio');
+            const conDatos = (filas || []).filter(f => f.costo_promedio_por_km != null);
+
+            destruirSiExiste('costoKm');
+            if (!conDatos.length) {
+                vacio.style.display = 'block';
+                return;
+            }
+            vacio.style.display = 'none';
+
+            const paleta = ['--series-1', '--series-2', '--series-3', '--series-4', '--series-5', '--series-6', '--series-7', '--series-8'];
+            const ordenadas = [...conDatos].sort((a, b) => a.tipo_vehiculo.localeCompare(b.tipo_vehiculo));
+
+            charts.costoKm = new Chart(document.getElementById('chart-costo-km'), {
+                type: 'bar',
+                data: {
+                    labels: ordenadas.map(f => f.tipo_vehiculo),
+                    datasets: [{
+                        label: 'Costo promedio por km',
+                        data: ordenadas.map(f => f.costo_promedio_por_km),
+                        backgroundColor: ordenadas.map((_, i) => c(paleta[i % paleta.length])),
+                        borderRadius: 4,
+                        categoryPercentage: 0.6,
+                    }],
+                },
+                options: {
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => fmtCOP.format(ctx.parsed.y) } } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: c('--gridline') }, ticks: { color: c('--muted') } },
+                        x: { grid: { display: false }, ticks: { color: c('--text-secondary') } },
+                    },
+                },
+            });
+        }
+
+        async function cargarEntregasDiarias() {
+            const filas = await getJSON('/dashboard/entregas-diarias?dias=30');
+            if (!filas) return;
+
+            destruirSiExiste('entregas');
+            charts.entregas = new Chart(document.getElementById('chart-entregas'), {
+                type: 'line',
+                data: {
+                    labels: filas.map(f => f.fecha),
+                    datasets: [
+                        { label: 'A tiempo', data: filas.map(f => f.entregados_a_tiempo), borderColor: c('--series-1'), backgroundColor: c('--series-1'), borderWidth: 2, pointRadius: 3, tension: 0.25 },
+                        { label: 'Con retraso', data: filas.map(f => f.entregados_tarde), borderColor: c('--series-2'), backgroundColor: c('--series-2'), borderWidth: 2, pointRadius: 3, tension: 0.25 },
+                        { label: 'Con incidencia', data: filas.map(f => f.con_incidencia), borderColor: c('--series-8'), backgroundColor: c('--series-8'), borderWidth: 2, pointRadius: 3, tension: 0.25 },
+                        { label: 'Devueltos', data: filas.map(f => f.devueltos), borderColor: c('--series-7'), backgroundColor: c('--series-7'), borderWidth: 2, pointRadius: 3, tension: 0.25 },
+                    ],
+                },
+                options: {
+                    plugins: { legend: { position: 'bottom', labels: { color: c('--text-secondary') } } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: c('--gridline') }, ticks: { color: c('--muted') } },
+                        x: { grid: { display: false }, ticks: { color: c('--muted') } },
+                    },
+                },
+            });
+        }
+
+        async function cargarEficiencia() {
+            const filas = await getJSON('/dashboard/eficiencia-combustible?limite=15');
+            if (!filas) return;
+            const conDatos = filas.filter(f => f.km_por_pct_combustible != null);
+
+            const colorPorClasificacion = (cl) => ({
+                eficiente: c('--status-good'), normal: c('--status-warning'), ineficiente: c('--status-critical'),
+            }[cl] || c('--muted'));
+
+            destruirSiExiste('eficiencia');
+            charts.eficiencia = new Chart(document.getElementById('chart-eficiencia'), {
+                type: 'bar',
+                data: {
+                    labels: conDatos.map(f => f.nombre_conductor),
+                    datasets: [{
+                        label: 'Km por 1% de combustible',
+                        data: conDatos.map(f => f.km_por_pct_combustible),
+                        backgroundColor: conDatos.map(f => colorPorClasificacion(f.clasificacion)),
+                        borderRadius: 4,
+                    }],
+                },
+                options: {
+                    indexAxis: 'y',
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, grid: { color: c('--gridline') }, ticks: { color: c('--muted') } },
+                        y: { grid: { display: false }, ticks: { color: c('--text-secondary') } },
+                    },
+                },
+            });
+        }
+
+        async function cargarMantenimiento() {
+            const filas = await getJSON('/dashboard/proyeccion-mantenimiento?dias=90');
+            const tbody = document.getElementById('tabla-mantenimiento');
+            if (!filas || !filas.length) {
+                tbody.innerHTML = `<tr><td colspan="5" class="vacio">Sin programas de mantenimiento próximos.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = filas.map(f => `
+    <tr>
+      <td>${f.placa_vehiculo || '—'}</td>
+      <td>${f.tipo_mantenimiento}</td>
+      <td>${badgeUrgencia(f.urgencia)}</td>
+      <td>${f.dias_restantes != null ? f.dias_restantes : '—'}</td>
+      <td>${f.km_restantes != null ? fmtNum.format(f.km_restantes) + ' km' : '—'}</td>
+    </tr>
+  `).join('');
+        }
+
+        async function cargarFeed() {
+            const filas = await getJSON('/dashboard/actividad-reciente?limite=25');
+            const feed = document.getElementById('feed');
+            if (!filas || !filas.length) {
+                feed.innerHTML = `<div class="vacio">Todavía no ha llegado ningún evento.</div>`;
+                return;
+            }
+            feed.innerHTML = filas.map(f => `
+    <div class="item">
+      <div class="hora">${new Date(f.ocurrido_en).toLocaleString('es-CO')} · ${f.tipo_evento}</div>
+      <div class="msg">${f.mensaje}</div>
+    </div>
+  `).join('');
+        }
+
+        async function cargarTodo() {
+            await Promise.all([
+                cargarResumen(), cargarUtilizacion(), cargarCostoPorKm(),
+                cargarEntregasDiarias(), cargarEficiencia(), cargarMantenimiento(), cargarFeed(),
+            ]);
+        }
+
+        cargarTodo();
+        setInterval(cargarTodo, 20000);
+    </script>
+
+</body>
+
+</html>
