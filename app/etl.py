@@ -10,6 +10,7 @@ from .models import (
     UtilizacionFlota, EficienciaCombustibleConductor, ProyeccionMantenimiento,
     CostoPorKmTipoVehiculo, ResumenEjecutivo, ResumenDiarioEntregas,
 )
+from .ingresos import sincronizar_ingresos, neto_del_periodo
 
 FLEET_SERVICE_URL = os.getenv("FLEET_SERVICE_URL")
 SHIPMENT_SERVICE_URL = os.getenv("SHIPMENT_SERVICE_URL")
@@ -270,6 +271,7 @@ async def _construir_resumen_ejecutivo(db: Session, vehiculos, conductores, envi
     resumen.tasa_cumplimiento_sla_global_pct = tasa_global
     resumen.facturacion_periodo_actual = round(facturacion_total, 2)
     resumen.programas_mantenimiento_vencidos = vencidos_count
+    resumen.ingresos_mes_actual_cop, resumen.ingresos_anio_actual_cop = neto_del_periodo(db)
     resumen.ultima_actualizacion_etl = datetime.now(timezone.utc)
     db.commit()
 
@@ -285,6 +287,7 @@ async def ejecutar_ciclo_etl():
 
         en_uso_count = await _actualizar_utilizacion_flota(db, vehiculos, envios, rutas)
         await _actualizar_costo_por_km(db, rutas)
+        detalle_ingresos = await sincronizar_ingresos(db, BILLING_SERVICE_URL, _get_json)
         vencidos_count = await _actualizar_eficiencia_y_mantenimiento(db, vehiculos, conductores)
         await _construir_resumen_ejecutivo(db, vehiculos, conductores, envios, en_uso_count, vencidos_count)
 
@@ -293,6 +296,7 @@ async def ejecutar_ciclo_etl():
             "envios_procesados": len(envios),
             "vehiculos_en_uso": en_uso_count,
             "programas_vencidos": vencidos_count,
+            "ingresos": detalle_ingresos,
         }
     except Exception as exc:
         resultado["ok"] = False

@@ -16,6 +16,7 @@ Panel de control y analítica de LogiTrack. Combina un consumidor de eventos de 
 
 - `GET /` — dashboard visual.
 - `GET /dashboard/resumen`, `/entregas-diarias`, `/utilizacion-flota`, `/costo-por-km`, `/eficiencia-combustible`, `/proyeccion-mantenimiento`, `/actividad-reciente` — datos en JSON.
+- `GET /dashboard/ingresos/mensual?anio=`, `/dashboard/ingresos/anual`, `/dashboard/ingresos/pedidos?mes=&estado=&cliente_id=` — ingresos en COP (cobrado, reembolsos, neto) calculados desde los pagos por pedido de Billing en cada ciclo de ETL. Solo administrador por el gateway.
 - `POST /etl/ejecutar` — dispara un ciclo de ETL inmediato (útil para pruebas).
 - `GET /health`
 

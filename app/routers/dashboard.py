@@ -1,5 +1,8 @@
 from datetime import date, timedelta
 
+import uuid
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -7,11 +10,13 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import (
     ResumenDiarioEntregas, UtilizacionFlota, EficienciaCombustibleConductor,
-    ProyeccionMantenimiento, CostoPorKmTipoVehiculo, ResumenEjecutivo, ActividadReciente,
+    ProyeccionMantenimiento, CostoPorKmTipoVehiculo, ResumenEjecutivo, ActividadReciente, IngresoPedido,
 )
+from ..ingresos import ingresos_por_mes, ingresos_por_anio
 from ..schemas import (
     ResumenDiarioEntregasLeer, UtilizacionFlotaLeer, EficienciaCombustibleConductorLeer,
     ProyeccionMantenimientoLeer, CostoPorKmTipoVehiculoLeer, ResumenEjecutivoLeer, ActividadRecienteLeer,
+    IngresoPeriodoLeer, IngresoPedidoLeer,
 )
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
@@ -75,4 +80,38 @@ def obtener_actividad_reciente(limite: int = Query(20, le=200), db: Session = De
         .order_by(ActividadReciente.ocurrido_en.desc())
         .limit(limite)
         .all()
+    )
+
+
+# ---------- Ingresos (COP) por pedido, mes y año ----------
+
+@router.get("/ingresos/mensual", response_model=list[IngresoPeriodoLeer])
+def ingresos_mensuales(anio: Optional[int] = Query(None, ge=2000, le=2100), db: Session = Depends(get_db)):
+    return ingresos_por_mes(db, anio)
+
+
+@router.get("/ingresos/anual", response_model=list[IngresoPeriodoLeer])
+def ingresos_anuales(db: Session = Depends(get_db)):
+    return ingresos_por_anio(db)
+
+
+@router.get("/ingresos/pedidos", response_model=list[IngresoPedidoLeer])
+def ingresos_por_pedido(
+    mes: Optional[str] = Query(None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$", description="YYYY-MM del cobro"),
+    estado: Optional[str] = Query(None, pattern="^(pendiente|confirmado|reembolsado)$"),
+    cliente_id: Optional[uuid.UUID] = None,
+    limite: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    consulta = db.query(IngresoPedido)
+    if mes:
+        consulta = consulta.filter(IngresoPedido.mes_pago == mes)
+    if estado:
+        consulta = consulta.filter(IngresoPedido.estado_pago == estado)
+    if cliente_id:
+        consulta = consulta.filter(IngresoPedido.cliente_id == cliente_id)
+    return (
+        consulta.order_by(IngresoPedido.confirmado_en.desc().nullslast(), IngresoPedido.pago_id)
+        .offset(offset).limit(limite).all()
     )

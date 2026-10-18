@@ -82,6 +82,8 @@ class ResumenEjecutivoLeer(BaseModel):
     tasa_cumplimiento_sla_global_pct: Optional[Decimal] = None
     facturacion_periodo_actual: Optional[Decimal] = None
     programas_mantenimiento_vencidos: int = 0
+    ingresos_mes_actual_cop: Optional[Decimal] = None
+    ingresos_anio_actual_cop: Optional[Decimal] = None
     ultima_actualizacion_etl: Optional[datetime] = None
 
 
@@ -92,3 +94,27 @@ class ActividadRecienteLeer(BaseModel):
     vehiculo_id: Optional[uuid.UUID] = None
     mensaje: str
     ocurrido_en: datetime
+
+
+class IngresoPeriodoLeer(BaseModel):
+    periodo: str  # "YYYY-MM" o "YYYY"
+    pedidos_cobrados: int
+    bruto_cop: Decimal
+    pedidos_reembolsados: int
+    reembolsos_cop: Decimal
+    neto_cop: Decimal
+    ticket_promedio_cop: Optional[Decimal] = None
+
+
+class IngresoPedidoLeer(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    pago_id: uuid.UUID
+    envio_id: uuid.UUID
+    codigo_envio: Optional[str] = None
+    cliente_id: uuid.UUID
+    monto_cop: Decimal
+    estado_pago: str
+    factura_numero: Optional[str] = None
+    factura_estado: Optional[str] = None
+    confirmado_en: Optional[datetime] = None
+    reembolsado_en: Optional[datetime] = None
