@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timezone, timedelta
 
 import httpx
+from .interno import cabeceras_internas
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -25,7 +26,7 @@ VENTANA_TELEMETRIA_DIAS = 7
 
 async def _get_json(url: str, params: dict | None = None, default=None):
     try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
+        async with httpx.AsyncClient(timeout=8.0, headers=cabeceras_internas()) as client:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
             return resp.json()

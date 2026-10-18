@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from .interno import proteger_servicio
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Analytics Service", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+proteger_servicio(app)
 app.include_router(dashboard.router)
 app.include_router(etl_manual.router)
 
