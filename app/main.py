@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -33,4 +34,4 @@ def servir_dashboard():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "analytics-service"}
+    return {"status": "ok", "service": "analytics-service", "version": os.getenv("APP_VERSION", "dev")}

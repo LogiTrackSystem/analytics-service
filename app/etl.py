@@ -3,7 +3,6 @@ from datetime import datetime, timezone, timedelta
 
 import httpx
 from .interno import cabeceras_internas
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
