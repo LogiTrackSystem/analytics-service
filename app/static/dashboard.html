@@ -318,6 +318,32 @@
 
     <div class="fila-charts">
         <div class="card">
+            <h2>Ingresos por mes (COP)</h2>
+            <p class="nota">Cobrado, reembolsos y neto por mes de cobro, a partir de los pagos por pedido de Billing.</p>
+            <canvas id="chart-ingresos"></canvas>
+            <div id="ingresos-vacio" class="vacio" style="display:none">Todavía no hay pedidos cobrados.</div>
+        </div>
+        <div class="card">
+            <h2>Últimos pedidos cobrados</h2>
+            <p class="nota">Un cobro por pedido (un pedido dividido se cobra una sola vez).</p>
+            <div class="tabla-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pedido</th>
+                            <th>Factura</th>
+                            <th>Monto</th>
+                            <th>Pago</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-ingresos"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="fila-charts">
+        <div class="card">
             <h2>Proyección de mantenimiento (90 días)</h2>
             <p class="nota">Por fecha real si existe; si no, estimada por kilometraje y tendencia real de uso del
                 vehículo.</p>
@@ -388,6 +414,8 @@
                 { label: 'Cumplimiento SLA', valor: r.tasa_cumplimiento_sla_global_pct != null ? `${fmtNum.format(r.tasa_cumplimiento_sla_global_pct)}%` : 'Sin datos', sub: 'histórico, todas las entregas' },
                 { label: 'Retenidos en aduana', valor: r.envios_internacionales_retenidos, sub: 'envíos internacionales' },
                 { label: 'Facturación del mes', valor: r.facturacion_periodo_actual != null ? fmtCOP.format(r.facturacion_periodo_actual) : 'Sin datos', sub: 'periodo actual' },
+                { label: 'Ingresos del mes (neto)', valor: r.ingresos_mes_actual_cop != null ? fmtCOP.format(r.ingresos_mes_actual_cop) : 'Sin datos', sub: 'pedidos cobrados menos reembolsos' },
+                { label: 'Ingresos del año (neto)', valor: r.ingresos_anio_actual_cop != null ? fmtCOP.format(r.ingresos_anio_actual_cop) : 'Sin datos', sub: 'año en curso' },
                 { label: 'Mantenimientos vencidos', valor: r.programas_mantenimiento_vencidos, sub: 'requieren atención inmediata' },
             ];
 
@@ -542,6 +570,54 @@
   `).join('');
         }
 
+        async function cargarIngresos() {
+            const meses = await getJSON('/dashboard/ingresos/mensual');
+            const vacio = document.getElementById('ingresos-vacio');
+            destruirSiExiste('ingresos');
+            if (meses && meses.length) {
+                vacio.style.display = 'none';
+                const ult = meses.slice(-12);
+                charts.ingresos = new Chart(document.getElementById('chart-ingresos'), {
+                    type: 'bar',
+                    data: {
+                        labels: ult.map(m => m.periodo),
+                        datasets: [
+                            { label: 'Cobrado', data: ult.map(m => Number(m.bruto_cop)), backgroundColor: c('--series-1'), borderRadius: 4 },
+                            { label: 'Reembolsos', data: ult.map(m => Number(m.reembolsos_cop)), backgroundColor: c('--series-8'), borderRadius: 4 },
+                            { label: 'Neto', data: ult.map(m => Number(m.neto_cop)), backgroundColor: c('--series-3'), borderRadius: 4 },
+                        ],
+                    },
+                    options: {
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: c('--text-secondary') } },
+                            tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${fmtCOP.format(ctx.parsed.y)}` } },
+                        },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: c('--gridline') }, ticks: { color: c('--muted') } },
+                            x: { grid: { display: false }, ticks: { color: c('--text-secondary') } },
+                        },
+                    },
+                });
+            } else if (meses) {
+                vacio.style.display = 'block';
+            }
+
+            const pedidos = await getJSON('/dashboard/ingresos/pedidos?limite=10');
+            const tbody = document.getElementById('tabla-ingresos');
+            if (!pedidos || !pedidos.length) {
+                tbody.innerHTML = `<tr><td colspan="4" class="vacio">Sin pedidos cobrados todavía.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = pedidos.map(p => `
+    <tr>
+      <td>${p.codigo_envio || '—'}</td>
+      <td>${p.factura_numero || '—'}</td>
+      <td>${fmtCOP.format(p.monto_cop)}</td>
+      <td>${p.estado_pago}</td>
+    </tr>
+  `).join('');
+        }
+
         async function cargarFeed() {
             const filas = await getJSON('/dashboard/actividad-reciente?limite=25');
             const feed = document.getElementById('feed');
@@ -560,7 +636,7 @@
         async function cargarTodo() {
             await Promise.all([
                 cargarResumen(), cargarUtilizacion(), cargarCostoPorKm(),
-                cargarEntregasDiarias(), cargarEficiencia(), cargarMantenimiento(), cargarFeed(),
+                cargarEntregasDiarias(), cargarEficiencia(), cargarMantenimiento(), cargarFeed(), cargarIngresos(),
             ]);
         }
 

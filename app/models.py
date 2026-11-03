@@ -101,6 +101,8 @@ class ResumenEjecutivo(Base):
     tasa_cumplimiento_sla_global_pct = Column(Numeric(5, 2), nullable=True)
     facturacion_periodo_actual = Column(Numeric(14, 2), nullable=True)
     programas_mantenimiento_vencidos = Column(Integer, nullable=False, default=0)
+    ingresos_mes_actual_cop = Column(Numeric(16, 2), nullable=True)   # neto: cobrado - reembolsado en el mes
+    ingresos_anio_actual_cop = Column(Numeric(16, 2), nullable=True)  # neto del año en curso
     ultima_actualizacion_etl = Column(DateTime(timezone=True), nullable=True)
 
 
@@ -114,3 +116,25 @@ class ActividadReciente(Base):
     vehiculo_id = Column(UUID(as_uuid=True), nullable=True)
     mensaje = Column(String(300), nullable=False)
     ocurrido_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class IngresoPedido(Base):
+    """Snapshot: una fila por pago de pedido, reconstruida desde Billing en cada ciclo de ETL.
+    Es la fuente de los indicadores de ingresos por pedido, mes y año (COP).
+    Un pago 'pendiente' no cuenta como ingreso; 'confirmado' y 'reembolsado' sí se cobraron."""
+    __tablename__ = "ingresos_pedido"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    pago_id = Column(UUID(as_uuid=True), nullable=False, unique=True, index=True)
+    envio_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    codigo_envio = Column(String(20), nullable=True)
+    cliente_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    monto_cop = Column(Numeric(14, 2), nullable=False)
+    estado_pago = Column(String(15), nullable=False)
+    factura_numero = Column(String(20), nullable=True)
+    factura_estado = Column(String(15), nullable=True)
+    confirmado_en = Column(DateTime(timezone=True), nullable=True)
+    reembolsado_en = Column(DateTime(timezone=True), nullable=True)
+    mes_pago = Column(String(7), nullable=True, index=True)        # "YYYY-MM" hora de Colombia
+    mes_reembolso = Column(String(7), nullable=True, index=True)
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
