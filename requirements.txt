@@ -9,3 +9,5 @@ httpx==0.28.1
 pydantic==2.13.5
 APScheduler==3.11.0
 psycopg[binary]
+prometheus-client==0.26.0
+prometheus-fastapi-instrumentator==8.1.0
